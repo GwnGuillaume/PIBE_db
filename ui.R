@@ -20,6 +20,10 @@ source('queries.R')
 # As we want to show milliseconds, we can change the global options of RStudio to show more digits
 my_options <- options(digits.secs = 3)
 
+# File path for crt file
+# crt_file_path = paste(getwd(), "ca/pibe.crt", sep = "/")      # local
+crt_file_path = setwd("/srv/shiny-server/PIBE_db/ca/pibe.crt")  # shinyapp.io
+
 # ElasticSearch parameters
 es_params <- c(host = "51.178.66.152",
                port = 443,
@@ -28,7 +32,7 @@ es_params <- c(host = "51.178.66.152",
                pwd = "PVLDn&+6Afnt.",
                path = "elastic",
                crtfile = "pibe.crt",
-               cainfo = "./pibe.crt")
+               cainfo = crt_file_path)
 
 cat(file = stderr(), "Establishing connexion\n")
 conn = connect(host = es_params["host"], port = es_params["port"], user = es_params["user"], pwd = es_params["pwd"], path=es_params["path"], transport_schema = es_params["transport_schema"], cainfo = es_params["cainfo"])
