@@ -28,7 +28,7 @@ es_params <- c(host = "51.178.66.152",
                pwd = "PVLDn&+6Afnt.",
                path = "elastic",
                crtfile = "pibe.crt",
-               cainfo = paste(getwd(), "pibe.crt", sep = "/"))
+               cainfo = "./pibe.crt")
 
 cat(file = stderr(), "Establishing connexion\n")
 conn = connect(host = es_params["host"], port = es_params["port"], user = es_params["user"], pwd = es_params["pwd"], path=es_params["path"], transport_schema = es_params["transport_schema"], cainfo = es_params["cainfo"])
