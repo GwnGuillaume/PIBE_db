@@ -22,7 +22,7 @@ my_options <- options(digits.secs = 3)
 
 # File path for crt file
 # crt_file_path = paste(getwd(), "ca/pibe.crt", sep = "/")      # local
-crt_file_path = setwd("/srv/shiny-server/PIBE_db/ca/pibe.crt")  # shinyapp.io
+crt_file_path = paste("/srv/shiny-server/PIBE_db", "ca/pibe.crt", sep = "/")  # shinyapp.io
 
 # ElasticSearch parameters
 es_params <- c(host = "51.178.66.152",
