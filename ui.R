@@ -14,6 +14,13 @@ library(elastic)
 library(httr)
 library(chron)
 library(qdapRegex)
+library(leaflet)
+library(sf)
+library(concaveman)
+library(shinyjs)
+library(shinycssloaders)
+
+jscode <- "shinyjs.refresh = function() { history.go(0); }"
 
 source('queries.R')
 
@@ -21,8 +28,9 @@ source('queries.R')
 my_options <- options(digits.secs = 3)
 
 # File path for crt file
-# crt_file_path = paste(getwd(), "ca/pibe.crt", sep = "/")      # local
-crt_file_path = paste("/srv/shiny-server/PIBE_db", "ca/pibe.crt", sep = "/")  # shinyapp.io
+crt_file_path = paste(getwd(), "ca/pibe.crt", sep = "/")      # local
+# crt_file_path = paste("/srv/shiny-server/PIBE_db", "ca/pibe.crt", sep = "/")  # shinyapp.io
+
 
 # ElasticSearch parameters
 es_params <- c(host = "51.178.66.152",
@@ -36,7 +44,7 @@ es_params <- c(host = "51.178.66.152",
 
 cat(file = stderr(), "Establishing connexion\n")
 conn = connect(host = es_params["host"], port = es_params["port"], user = es_params["user"], pwd = es_params["pwd"], path=es_params["path"], transport_schema = es_params["transport_schema"], cainfo = es_params["cainfo"])
-cluster_health(conn = conn)
+server_health <- cluster_health(conn = conn)
 
 
 # Data sample for initial ui
@@ -91,10 +99,24 @@ end_time = end_date_time
 
 # write.csv(es.init.df, paste(getwd(), "Data_sample.csv", sep = "/"), row.names = FALSE)
 
+
+# # Sensors
+# sensors <- get_sensors_info("./input/sensors.csv")
+# sensors.point <- st_as_sf(x = sensors,
+#                           coords = c("longitude", "latitude"),
+#                           crs = "+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0")
+# points_hull <- sensors.point %>% st_combine() %>% st_cast("POINT") %>% st_sf()
+# p.X <- sf::st_as_sf(x = points_hull, coords = c("Xi", "Yi"), crs = 4326)
+# p.Y<- sf::st_as_sf(x = points_hull, coords = c("Xj", "Yj"), crs = 4326)
+# nodes<-cbind(p.Y,p.X) 
+# concave_hull <- points_hull %>% concaveman()
+# centre_point_df <- st_centroid(concave_hull$polygons) %>% st_transform(4326) %>% st_set_crs(2154)
+# centre_point <- centre_point_df[[1]]
+
 dataset <- es.init.df
 
 dashboardPage(
-
+  
   dashboardHeader(title = 'PIBE Database Management Dashboard',
                   tags$li(class = "dropdown",
                           tags$a(href='https://www.anr-pibe.com/en', 
@@ -114,7 +136,7 @@ dashboardPage(
                                                 status = 'warning')),
                   dropdownMenu(type = 'tasks',
                                badgeStatus = 'success',
-                               taskItem(value = 90, color = 'green', 'Documentation'),
+                               taskItem(value = server_health$active_shards_percent_as_number, color = server_health$status, 'Cluster health'),
                                taskItem(value = 17, color = 'aqua', 'Project X'),
                                taskItem(value = 75, color = 'yellow', 'Server deployment'),
                                taskItem(value = 80, color = 'red', 'Overall project'))
@@ -129,13 +151,21 @@ dashboardPage(
       # Sensors map
       menuItem("Sensors map", tabName = "sensors_map", icon = icon("map-marked-alt")),
       # Data
-      menuItem("Data query", tabName = "data_query", icon = icon("calendar")),
-      splitLayout(cellWidths = c("50%", "50%"),
-                  dateInput("start_date", label = "Date from:", value = start_date, format = "yyyy/mm/dd"),
-                  timeInput("start_time", label = "at", value = strptime(start_date_time, "%H:%M"), seconds = FALSE)),
-      splitLayout(cellWidths = c("50%", "50%"),
-                  dateInput("end_date", label = "Date to:", value = end_date, format = "yyyy/mm/dd"),
-                  timeInput("end_time", label = "at", value = strptime(end_date_time, "%H:%M"), seconds = FALSE)),
+      menuItem("Data query", tabName = "data_query", icon = icon("calendar"),
+               menuItem(
+                 splitLayout(cellWidths = c("50%", "50%"),
+                             dateInput("start_date", label = "Date from:", value = start_date, format = "yyyy/mm/dd"),
+                             timeInput("start_time", label = "at", value = strptime(start_date_time, "%H:%M"), seconds = FALSE))),
+               menuItem(
+                 splitLayout(cellWidths = c("50%", "50%"),
+                             dateInput("end_date", label = "Date to:", value = end_date, format = "yyyy/mm/dd"),
+                             timeInput("end_time", label = "at", value = strptime(end_date_time, "%H:%M"), seconds = FALSE)))),
+      # splitLayout(cellWidths = c("50%", "50%"),
+      #             dateInput("start_date", label = "Date from:", value = start_date, format = "yyyy/mm/dd"),
+      #             timeInput("start_time", label = "at", value = strptime(start_date_time, "%H:%M"), seconds = FALSE)),
+      # splitLayout(cellWidths = c("50%", "50%"),
+      #             dateInput("end_date", label = "Date to:", value = end_date, format = "yyyy/mm/dd"),
+      #             timeInput("end_time", label = "at", value = strptime(end_date_time, "%H:%M"), seconds = FALSE)),
       # Fields and indicators
       menuItem("Fields and indicators", tabName = "fields_indicators", icon = icon("dashboard")),
       splitLayout(cellWidths = c("50%", "50%"),
@@ -150,10 +180,10 @@ dashboardPage(
       splitLayout(cellWidths = c("50%", "50%"),
                   checkboxInput('jitter', 'Jitter'),
                   checkboxInput('smooth', 'Smooth')),
-      selectInput('facet_row', label = 'Facet Row', choices = names(dataset)),  # c(None='.', names(dataset))
-      selectInput('facet_col', 'Facet Column', c(None='.', names(dataset)), size = 2, selectize = FALSE)),
-      selectInput('color', label = 'Color', choices = c('None', names(dataset)))
-  ), 
+      selectInput('facet_row', label = 'Facet Row', choices = c(None='.', str_remove(string = names(dataset), pattern = c("timestamp", "Value")))),  # c(None='.', names(dataset))
+      selectInput('facet_col', 'Facet Column', c(None='.', str_remove(string = names(dataset), pattern = c("timestamp", "value")))),
+      selectInput('color', label = 'Color', choices = c('None', str_remove(string = names(dataset), pattern = c("timestamp", "value"))))
+    )), 
   
   ## Body content
   dashboardBody(
@@ -166,14 +196,23 @@ dashboardPage(
               div(em("URL link: "), tags$a(href = "https://www.anr-pibe.com/en", "https://www.anr-pibe.com/en")),
               em("em() creates italicized (i.e, emphasized) text."),
               p("Data are distributed under the", span("licence", style = "color:red"), "..."),
-              tags$video(id="video2", type = "video/mp4",src = "https://cerema.cache.ephoto.fr/link/ple18ocjgj4qydc.mp4", controls = "controls")
+              tags$video(src = "https://cerema.cache.ephoto.fr/link/ple18ocjgj4qydc.mp4", type = "video/mp4", autoplay=TRUE, muted=TRUE, playsinline=TRUE, loop=TRUE, controls=TRUE)
+      ),
+      
+      # Map
+      tabItem(tabName = "sensors_map",
+              # leaflet() %>%
+              #   addTiles() %>%  # Add default OpenStreetMap map tiles
+              #   setView(centre_point[1], centre_point[2], zoom=the_zoom) %>%
+              #   addCircleMarkers(data=sensors.point
+              #                    , radius=6, stroke = FALSE, fillOpacity=0.75, popup=paste(row.names(sensors.point)), group=c("Sensors"))
       ),
       
       # Data tab content
       tabItem(tabName = "data_query",
               h2("Data content"),
               fluidRow(
-                box(plotOutput("plot1", height = 250)),
+                box(plotOutput("plot1", height = 250) %>% withSpinner(color="#0dc5c1")),
                 
                 box(
                   title = "Controls",
@@ -185,16 +224,19 @@ dashboardPage(
       # Visualization
       tabItem(tabName = "visualization",
               h2("Data content"),
-              fluidRow(
-                box(plotOutput("plot", height = 250)),
-                
-                box(
-                  title = "Controls",
-                  sliderInput("time_slider", label = "Time slider", 
-                              min = as.POSIXct(x = the_start_date_time, format = "%Y-%m-%d %H:%M:%S CET"), 
-                              max = as.POSIXct(x = the_end_date_time, format = "%Y-%m-%d %H:%M:%S CET"), 
-                              value =  c(as.POSIXct(x = the_start_date_time, format = "%Y-%m-%d %H:%M:%S CET"), as.POSIXct(x = the_end_date_time, format = "%Y-%m-%d %H:%M:%S CET")))
-                )
+              fluidRow(box(plotOutput("plot", height = 250) %>% withSpinner(color="#0dc5c1")),
+                       box(
+                         title = "Controls",
+                         sliderInput("time_slider", label = "Time slider", 
+                                     min = as.POSIXct(x = the_start_date_time, format = "%Y-%m-%d %H:%M:%S CET"), 
+                                     max = as.POSIXct(x = the_end_date_time, format = "%Y-%m-%d %H:%M:%S CET"), 
+                                     value =  c(as.POSIXct(x = the_start_date_time, format = "%Y-%m-%d %H:%M:%S CET"), as.POSIXct(x = the_end_date_time, format = "%Y-%m-%d %H:%M:%S CET")))
+                       ),
+                       useShinyjs(),
+                       extendShinyjs(text = jscode, functions = c("winprint")),
+                       actionButton("refresh", label = "Refresh data", icon = icon("sync")),
+                       downloadButton("downloadData", label = "Download"),
+                       p("Click the button to update the data displayed in the visualization panel.")
               )
       )
     )
