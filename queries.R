@@ -1,3 +1,67 @@
+# Download latest
+# download_data <- function(conn, start_date_input, start_time_input, end_date_input, end_time_input, fields_input, timesampling_input, sensors_input, indicators_input, frequencies_input){
+#   the_start_date = as.Date(x = start_date_input, format = "%Y-%m-%d")
+#   the_start_date_time = update(as.POSIXct(x = start_time_input, format = "%Y-%m-%d %H:%M:%S"), year = year(the_start_date), month = month(the_start_date), mday = day(the_start_date))
+#   the_end_date = as.Date(x = end_date_input, format = "%Y-%m-%d")
+#   the_end_date_time = update(as.POSIXct(x = end_time_input, format = "%Y-%m-%d %H:%M:%S"), year = year(the_end_date), month = month(the_end_date), mday = day(the_end_date))
+#   print("\n Reloading data")
+#   dataset <- get_data(conn = conn,
+#                       start_date = format(as.POSIXct(x = start_date_input, format = "%Y-%m-%d"), "%Y/%m/%d"),
+#                       start_time = format(as.POSIXct(x = the_start_date_time, format = "%Y-%m-%d %H:%M:%S"), "%H:%M"),  # start_time_input,
+#                       end_date = format(as.POSIXct(x = end_date_input, format = "%Y-%m-%d"), "%Y/%m/%d"),
+#                       end_time = format(as.POSIXct(x = the_end_date_time, format = "%Y-%m-%d %H:%M:%S"), "%H:%M"),  # end_time_input
+#                       fields = fields_input,
+#                       timesampling = timesampling_input,
+#                       sensors = sensors_input,
+#                       indicators = indicators_input,
+#                       frequencies = frequencies_input)
+#   print("\n \t -> data reloaded")
+#   return(dataset)
+# }
+download_data <- function(conn, input){
+  the_start_date = as.Date(x = input$start_date, format = "%Y-%m-%d")
+  the_start_date_time = update(as.POSIXct(x = input$start_time, format = "%Y-%m-%d %H:%M:%S"), year = year(the_start_date), month = month(the_start_date), mday = day(the_start_date))
+  the_end_date = as.Date(x = input$end_date, format = "%Y-%m-%d")
+  the_end_date_time = update(as.POSIXct(x = input$end_time, format = "%Y-%m-%d %H:%M:%S"), year = year(the_end_date), month = month(the_end_date), mday = day(the_end_date))
+  print("\n Reloading data")
+  dataset <- get_data(conn = conn,
+                      start_date = format(as.POSIXct(x = input$start_date, format = "%Y-%m-%d"), "%Y/%m/%d"),
+                      start_time = format(as.POSIXct(x = the_start_date_time, format = "%Y-%m-%d %H:%M:%S"), "%H:%M"),  # input$start_time,
+                      end_date = format(as.POSIXct(x = input$end_date, format = "%Y-%m-%d"), "%Y/%m/%d"),
+                      end_time = format(as.POSIXct(x = the_end_date_time, format = "%Y-%m-%d %H:%M:%S"), "%H:%M"),  # input$end_time
+                      fields = input$fields,
+                      timesampling = input$timesampling,
+                      sensors = input$sensors,
+                      indicators = input$indicators,
+                      frequencies = input$frequencies)
+  print("\n \t -> data reloaded")
+  return(dataset)
+}
+
+
+# Get sensors information
+get_sensors_info <- function(sensors_filename){
+  sensors_tmp <- read_csv(file = sensors_filename)
+  # the_dates <- read_csv(file = 'Bonneval_data.csv')
+  sensors <- data.frame(t(sensors_tmp[-1]))
+  colnames(sensors) <- t(sensors_tmp[, 1])
+  remove(sensors_tmp)
+  sensors <- sensors %>% 
+    separate(col = "coord. GPS", into = c("latitude", "longitude", "latdeg", "longdeg"), sep = " ", convert = TRUE) %>% 
+    mutate(latitude = str_sub(latitude, 1, -2)) %>% 
+    mutate(longitude = as.numeric(longitude))  %>% 
+    mutate(longitude = as.numeric(longitude)) 
+  row_names = rownames(sensors)
+  for(idr in seq(length(row_names))){
+    if(isTRUE(startsWith(row_names[idr], prefix = "..."))){
+      row_names[idr] <- row_names[idr-1]
+    }
+  }
+  rownames(sensors) <- make.names(row_names, unique = TRUE)
+  sensors <- sensors[!is.na(sensors$longitude), ]
+  return(sensors)
+}
+
 # start_dt : format = "%Y/%m/%d-%H:%M"
 # end_dt : format = "%Y/%m/%d-%H:%M"
 # indicators : character (ex: `c("Leq_A", "Leq_Z")`)
@@ -36,6 +100,16 @@ query_discover_params <- function(start_dt, end_dt, indicators){
                                        "fields": {"*": {}},
                                        "fragment_size": 2147483647}}', 
                        indicators.str, indicators.str, t_beg, t_end)
+  return(txt_query)
+}
+
+# html text when downloading data
+downloading_text <- function(input){
+  txt_query <- sprintf('{"<p><img style="display: block; margin-left: auto; margin-right: auto;" src="https://www.anr-pibe.com/sites/pibe/files/anr-pibe-logo.gif?w=101&h=45&mode=crop&scale=both" /></p>
+<h1 style="text-align: center;">Downloading data ... &nbsp;<strong>Application</strong></h1>
+<hr />
+<p style="text-align: left;">indicators: %sTEXT TEXT TEXT TEXT TEXT TEXT TEXT................................................... </p>}', 
+                       input$indicators)
   return(txt_query)
 }
 
@@ -160,22 +234,6 @@ get_data <- function(conn, start_date, start_time, end_date, end_time, fields, t
   tmp_data <- tmp_data$hits$hits
   df <- data.frame(timestamp = as.POSIXct(character()), sensor = character(), indicators = character(), value = double(), stringsAsFactors = FALSE)
   tmp_timestamp = as.POSIXct(start_date_time, format = "%Y/%m/%d-%H:%M")
-  # # print("indexes:")
-  # # print(indexes)
-  # for (idt in seq(1, length(tmp_data))) {
-  #   print(idt)
-  #   tmp_val = as.numeric(tmp_data[[idt]]$fields[indicators][[1]])
-  #   if(identical(tmp_val, numeric(0))) {
-  #     tmp_val = NA
-  #   }
-  #   tmp_timestamp = as.POSIXct(tmp_data[[idt]]$`_source`$`@timestamp`)
-  #   es.init.index = tmp_data[[idt]]$'_index'
-  #   es.init.sensor <- str_split(es.init.index, pattern = "_", n = 3)[[1]][2]
-  #   df <- df %>% add_row(timestamp = tmp_timestamp,
-  #                        sensor = es.init.sensor,
-  #                        indicators = indicators,
-  #                        value = tmp_val)
-  # }
   while (tmp_timestamp != as.POSIXct(end_date_time, format = "%Y/%m/%d-%H:%M")) {
     start_date_time = format(x = tmp_timestamp, format = "%Y/%m/%d-%H:%M")
     tmp_data <- Search(conn = conn, index = indexes, body = query_discover_params(start_dt=start_date_time, end_dt=end_date_time, indicators))
