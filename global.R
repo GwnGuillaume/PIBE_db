@@ -1,23 +1,124 @@
-# Download latest
-# download_data <- function(conn, start_date_input, start_time_input, end_date_input, end_time_input, fields_input, timesampling_input, sensors_input, indicators_input, frequencies_input){
-#   the_start_date = as.Date(x = start_date_input, format = "%Y-%m-%d")
-#   the_start_date_time = update(as.POSIXct(x = start_time_input, format = "%Y-%m-%d %H:%M:%S"), year = year(the_start_date), month = month(the_start_date), mday = day(the_start_date))
-#   the_end_date = as.Date(x = end_date_input, format = "%Y-%m-%d")
-#   the_end_date_time = update(as.POSIXct(x = end_time_input, format = "%Y-%m-%d %H:%M:%S"), year = year(the_end_date), month = month(the_end_date), mday = day(the_end_date))
-#   print("\n Reloading data")
-#   dataset <- get_data(conn = conn,
-#                       start_date = format(as.POSIXct(x = start_date_input, format = "%Y-%m-%d"), "%Y/%m/%d"),
-#                       start_time = format(as.POSIXct(x = the_start_date_time, format = "%Y-%m-%d %H:%M:%S"), "%H:%M"),  # start_time_input,
-#                       end_date = format(as.POSIXct(x = end_date_input, format = "%Y-%m-%d"), "%Y/%m/%d"),
-#                       end_time = format(as.POSIXct(x = the_end_date_time, format = "%Y-%m-%d %H:%M:%S"), "%H:%M"),  # end_time_input
-#                       fields = fields_input,
-#                       timesampling = timesampling_input,
-#                       sensors = sensors_input,
-#                       indicators = indicators_input,
-#                       frequencies = frequencies_input)
-#   print("\n \t -> data reloaded")
-#   return(dataset)
-# }
+# library(curl)
+# set_config(config(ssl_verifypeer = FALSE))
+# options(RCurlOptions = list(ssl_verifypeer = FALSE))
+# options(rsconnect.check.certificate = FALSE)
+
+library(tidyverse)
+library(shiny)
+library(shinyWidgets)
+library(shinydashboard)
+library(shinyTime)
+library(lubridate)
+library(hms)
+library(ggplot2)
+library(scales)
+library(elastic)
+library(httr)
+library(chron)
+library(qdapRegex)
+library(leaflet)
+library(sf)
+library(concaveman)
+library(shinyjs)
+library(shinycssloaders)
+
+jscode <- "shinyjs.refresh = function() { history.go(0); }"
+
+# Change the global options of RStudio to show milliseconds
+my_options <- options(digits.secs = 3)
+
+# File path for crt file
+crt_file_path = paste(getwd(), "www/pibe.crt", sep = "/")
+# crt_file_path = paste("/srv/shiny-server/PIBE_db", "www/pibe.crt", sep = "/")  # shinyapp.io
+
+
+# ElasticSearch parameters
+es_params <- c(host = "51.178.66.152",
+               port = 443,
+               transport_schema = "https",
+               user = "lecteur",
+               pwd = "PVLDn&+6Afnt.",
+               path = "elastic",
+               crtfile = "pibe.crt",
+               cainfo = crt_file_path)
+
+# Connection to remote server
+cat(file = stderr(), "Establishing connexion\n")
+conn = connect(host = es_params["host"], port = es_params["port"], user = es_params["user"], pwd = es_params["pwd"], path=es_params["path"], transport_schema = es_params["transport_schema"], cainfo = es_params["cainfo"])
+server_health <- cluster_health(conn = conn)
+
+
+# Data sample for initial ui
+# count(conn = conn, index = get_indexes_from_input(es.init.fields, es.init.sensors, es.init.time.sampling))
+sample_data_file = paste(getwd(), "Data_sample.csv", sep = "/")
+if (file.exists(sample_data_file)){
+  es.init.df <- read_csv(file = sample_data_file, col_names = TRUE)
+} else {
+  start_date = "2020/03/22"
+  start_time = "10:00"
+  end_date = "2020/03/29"
+  end_time = "01:00"
+  es.init.fields <- c("acoustique")
+  es.init.time.sampling <- c("1min") 
+  es.init.sensors <- c("a1", "a2", "a3", "a4", "a5")
+  es.init.acoustic.indicators <- c("Leq")
+  es.init.acoustic.frequencies <- c("A", "Z")
+  es.init.df <- get_data(conn = conn, 
+                         start_date = start_date, 
+                         start_time = start_time, 
+                         end_date = end_date, 
+                         end_time = end_time, 
+                         fields = es.init.fields, 
+                         timesampling = es.init.time.sampling, 
+                         sensors = es.init.sensors, 
+                         indicators = es.init.acoustic.indicators, 
+                         frequencies = es.init.acoustic.frequencies)
+}
+
+# Available queries
+time.samplings <- c("100ms", "1min", "10min")
+acoustic.sensors = c("a1", "a2", "a3", "a4", "a5")
+acoustic.indicators <- c("Leq", "L10", "L50", "L90")
+acoustic.frequencies <- c("6.3", "8", "10", "12.5", "16", "20", "25", "31.5", "40", "50", "63", "80", "100", "125", "160", "200", "250", "315", "400", "500", "630", "800", "1000",
+                          "1250", "1600", "2000", "2500", "3150", "4000", "5000", "6300", "8000", "10000", "12500", "16000", "20000", "A", "Z", "all")
+start_date = "2020/03/22"
+start_time = "10:00"
+# start_date_time = start_time
+the_start_date = as.Date(x = start_date, format = "%Y/%m/%d")
+the_start_date_time = update(as.POSIXct(x = start_time, format = "%H:%M"), year = year(the_start_date), month = month(the_start_date), mday = day(the_start_date))
+start_date_time = format(the_start_date_time, "%H:%M")
+start_time = start_date_time
+end_date = "2020/03/25"
+end_time = "01:00"
+# end_date_time = end_time
+the_end_date = as.Date(x = end_date, format = "%Y/%m/%d")
+the_end_date_time = update(as.POSIXct(x = end_time, format = "%H:%M"), year = year(the_end_date), month = month(the_end_date), mday = day(the_end_date))
+end_date_time = format(the_end_date_time, "%H:%M")
+end_time = end_date_time
+# meteo.sensors = c("a1", "a2", "a3", "a4", "a5")
+# meteo.indicators <- c("AtmPress", "Humidity", "Rain", "Temperature", "WindDirection", "WindSpeed")
+
+# write.csv(es.init.df, paste(getwd(), "Data_sample.csv", sep = "/"), row.names = FALSE)
+
+
+# # Sensors
+# sensors <- get_sensors_info("./input/sensors.csv")
+# sensors.point <- st_as_sf(x = sensors,
+#                           coords = c("longitude", "latitude"),
+#                           crs = "+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0")
+# points_hull <- sensors.point %>% st_combine() %>% st_cast("POINT") %>% st_sf()
+# p.X <- sf::st_as_sf(x = points_hull, coords = c("Xi", "Yi"), crs = 4326)
+# p.Y<- sf::st_as_sf(x = points_hull, coords = c("Xj", "Yj"), crs = 4326)
+# nodes<-cbind(p.Y,p.X) 
+# concave_hull <- points_hull %>% concaveman()
+# centre_point_df <- st_centroid(concave_hull$polygons) %>% st_transform(4326) %>% st_set_crs(2154)
+# centre_point <- centre_point_df[[1]]
+
+dataset <- es.init.df
+
+## Functions
+
+# Download data from remote server
 download_data <- function(conn, input){
   the_start_date = as.Date(x = input$start_date, format = "%Y-%m-%d")
   the_start_date_time = update(as.POSIXct(x = input$start_time, format = "%Y-%m-%d %H:%M:%S"), year = year(the_start_date), month = month(the_start_date), mday = day(the_start_date))
@@ -37,7 +138,6 @@ download_data <- function(conn, input){
   print("\n \t -> data reloaded")
   return(dataset)
 }
-
 
 # Get sensors information
 get_sensors_info <- function(sensors_filename){
@@ -458,6 +558,3 @@ query_discover <- function(){
     }
   }'
 }
-
-
-
