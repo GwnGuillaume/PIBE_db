@@ -1,0 +1,13 @@
+name: PIBE_db
+title: PIBE_db
+username:
+account: gguillaume
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 4604748
+bundleId: 5444516
+url: https://gguillaume.shinyapps.io/PIBE_db/
+when: 1641569662.58876
+lastSyncTime: 1641569662.58877
+asMultiple: FALSE
+asStatic: FALSE
