@@ -655,10 +655,10 @@ sensors <- sensors %>% mutate(color_icon = case_when(color_selected == "green" ~
 map_sensors_tab <- leaflet(data = sensors) %>% 
   addTiles() %>%
   setView(lng = centre_point[1], lat = centre_point[2], zoom = 14) %>%
-  addMarkers(data = sensors, lng = ~lon, lat = ~lat, icon = ~my_icons[mast], group = ~mast,    # ~my_icons2[color_icon]
-             popup = ~sapply(mast, sensor_popup))
+  addMarkers(data = sensors, lng = ~lon, lat = ~lat, icon = ~my_icons2[color_icon], group = ~mast,    # ~my_icons2[color_icon]
+             popup = ~mapply(sensor_popup, mast))
 map_visu_tab <- leaflet(data = sensors) %>% 
   addTiles() %>%
   setView(lng = centre_point[1], lat = centre_point[2], zoom = 14) %>%
-  addMarkers(data = sensors, lng = ~lon, lat = ~lat, icon = ~my_icons[mast], group = ~mast,    # ~my_icons2[color_icon]
-             popup = ~sapply(mast, sensor_popup))
+  addMarkers(data = sensors, lng = ~lon, lat = ~lat, icon = ~my_icons2[color_icon], group = ~mast,    # ~my_icons2[color_icon]
+             popup = ~mapply(sensor_popup, mast))
