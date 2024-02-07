@@ -1,0 +1,23 @@
+template:
+  navbar:
+    title: "PIBE Database Management Dashboard"
+    logo: "/www/img/anr-pibe-logo.gif"
+home:
+  href: 'R/ui.R'
+  references:
+    - R/global.R
+    - R/ui.R
+    - R/server.R
+license: 'LICENSE'
+build:
+  vignettes: true
+  reference: true
+  articles: true
+  home: false
+  pkgdown: true
+  path: "docs"  # Définit le dossier de sortie comme "docs"
+  install: FALSE
+articles:
+  title: "Shinydashboard UI"
+  content: "ui-doc.md"  # Le contenu doit être dans le même dossier que le fichier _pkgdown.yml
+  path: "articles"  # Ajoutez cette ligne pour spécifier le dossier des articles

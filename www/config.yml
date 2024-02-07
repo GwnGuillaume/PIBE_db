@@ -1,0 +1,9 @@
+default:
+  host: "localhost"
+  port: 9200
+  transport_schema: "http"
+  user: ""
+  pwd: ""
+  path: ""
+  crtfile: ""
+  cainfo: ""

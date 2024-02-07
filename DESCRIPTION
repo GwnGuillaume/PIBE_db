@@ -1,0 +1,11 @@
+Package: pibe
+Type: Package
+Title: PIBE Database Management Dashboard
+Version: 0.1.0
+Description: Shiny dashboard scripts for managing, querying and viewing acoustic and meteorological experimental data from the PIBE database.
+Encoding: UTF-8
+Authors@R: 
+  person("Gwenael", "Guillaume", email = "gwenael.guillaume@cerema.fr", role = c("aut", "cre"), 
+         comment = c(ORCID = "0000-0002-0582-6827"))
+RoxygenNote: 7.2.3
+Config/Needs/website: rmarkdown
